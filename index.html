@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How the coaching agent judges a swing – logic review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F5F7F6; --card:#FFFFFF; --ink:#13253F; --muted:#56637A; --line:#D5DBE3;
+  --stitch:#C0372F; --stitch-soft:#F6DEDB; --grass:#2D7A4E; --band:#D7ECDD; --band-edge:#2D7A4E;
+  --ref:#9AA4B2; --ref-band:#E7EAEE; --chip:#E9EEF5; --focus:#1F5FBF;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1828; --card:#152237; --ink:#E6ECF4; --muted:#A3AFC2; --line:#2A3A54;
+    --stitch:#F07A70; --stitch-soft:#3D2226; --grass:#6CCB93; --band:#1D3A2B; --band-edge:#6CCB93;
+    --ref:#7D8AA0; --ref-band:#22314A; --chip:#1E2E47; --focus:#7FB0FF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1828; --card:#152237; --ink:#E6ECF4; --muted:#A3AFC2; --line:#2A3A54;
+  --stitch:#F07A70; --stitch-soft:#3D2226; --grass:#6CCB93; --band:#1D3A2B; --band-edge:#6CCB93;
+  --ref:#7D8AA0; --ref-band:#22314A; --chip:#1E2E47; --focus:#7FB0FF;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:17px;line-height:1.6;-webkit-text-size-adjust:100%}
+main{max-width:760px;margin:0 auto;padding:28px 20px 64px}
+h1,h2,h3{font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;font-weight:600;line-height:1.1;letter-spacing:.005em;margin:0}
+h1{font-size:clamp(2.4rem,7vw,3.6rem);font-weight:700}
+h2{font-size:2rem;margin-top:56px;padding-top:16px;border-top:3px solid var(--ink)}
+h3{font-size:1.35rem;margin-top:28px}
+p{margin:.7em 0;max-width:68ch}
+a{color:var(--ink);text-decoration-color:var(--stitch);text-underline-offset:3px;text-decoration-thickness:2px}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.lede{font-size:1.15rem;color:var(--ink)}
+.muted{color:var(--muted)}
+.small{font-size:.92rem}
+.kicker{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-size:1.05rem;font-weight:600;color:var(--stitch);margin:0 0 6px}
+.stitch{height:10px;margin:22px 0 4px;background:
+  repeating-linear-gradient(90deg,transparent 0 6px,var(--stitch) 6px 14px,transparent 14px 20px);
+  -webkit-mask:linear-gradient(transparent 0 3px,#000 3px 7px,transparent 7px);mask:linear-gradient(transparent 0 3px,#000 3px 7px,transparent 7px);opacity:.85}
+.hero-fig{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 16px 10px;margin:22px 0 8px}
+.figcap{font-size:.92rem;color:var(--muted);margin:6px 0 0}
+.toc{columns:2;column-gap:28px;padding:0;margin:18px 0 0;list-style:none;font-size:.98rem}
+.toc li{break-inside:avoid;padding:3px 0}
+@media (max-width:520px){.toc{columns:1}}
+ol.steps{list-style:none;padding:0;margin:18px 0;counter-reset:s}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:44px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+ol.steps li::before{content:counter(s);font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:1.7rem;line-height:1;color:var(--stitch);text-align:center;padding-top:2px}
+ol.steps b{display:block}
+.who{display:inline-block;font-size:.8rem;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--chip);color:var(--muted);margin-left:6px;vertical-align:2px}
+.toggle{display:inline-flex;border:1.5px solid var(--ink);border-radius:999px;overflow:hidden;margin:10px 0 4px}
+.toggle button{font:inherit;font-size:.95rem;font-weight:600;background:transparent;color:var(--ink);border:0;padding:7px 14px;cursor:pointer;min-height:40px}
+.toggle button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.metric{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px 10px;margin:12px 0}
+.metric.ref{background:transparent;border-style:dashed}
+.mhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}
+.mname{font-weight:600;font-size:1.08rem}
+.chip{font-size:.78rem;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.chip.j{background:var(--band);color:var(--grass)}
+.chip.r{background:var(--ref-band);color:var(--muted)}
+.chip.p{background:var(--stitch-soft);color:var(--stitch)}
+.mdef{margin:4px 0 2px;font-size:.96rem}
+.mvals{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:.92rem;color:var(--muted);margin:2px 0}
+.mvals strong{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.mnote{font-size:.9rem;color:var(--muted);margin:4px 0 2px}
+svg.bar{display:block;width:100%;max-width:480px;height:auto;margin:6px 0 0;overflow:visible}
+svg.bar text{font-family:"Barlow",system-ui,sans-serif;font-size:14px;fill:var(--muted);font-variant-numeric:tabular-nums}
+svg.bar .lab{fill:var(--ink);font-weight:600}
+svg.bar .flagtxt{fill:var(--stitch);font-weight:600}
+.callout{border-left:4px solid var(--stitch);padding:8px 0 8px 14px;margin:18px 0}
+.callout p{margin:.3em 0}
+.rules{list-style:none;padding:0;margin:14px 0}
+.rules li{padding:10px 0;border-bottom:1px solid var(--line)}
+.rules b{font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto;margin:12px 0;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:.94rem;min-width:420px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:1.02rem}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.prob{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0}
+.prob.off{background:transparent;border-style:dashed}
+.prob .say{margin:8px 0 0;padding:8px 12px;background:var(--paper);border-radius:8px;font-size:.96rem}
+.prob .say div{margin:2px 0}
+.prob .say span{color:var(--muted);font-size:.85rem;display:inline-block;min-width:44px}
+.drill{padding:10px 0;border-bottom:1px solid var(--line)}
+.drill:last-child{border-bottom:0}
+.drill .dn{font-weight:600}
+.drill .dr{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.9rem;margin-left:6px}
+.slider{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0}
+.slider input[type=range]{width:100%;accent-color:var(--stitch);height:32px}
+.readout{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline;margin-top:6px}
+.big{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:2.6rem;line-height:1;font-variant-numeric:tabular-nums}
+.note-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
+.note-card .hl{font-weight:600;font-size:1.08rem;margin:0 0 6px}
+.note-card dl{margin:6px 0 0}
+.note-card dt{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:1.02rem;margin-top:10px}
+.note-card dd{margin:2px 0 0}
+.example{margin:18px 0 30px}
+.qs{padding-left:1.4em}
+.qs li{padding:6px 0}
+footer{margin-top:56px;padding-top:14px;border-top:1px solid var(--line);font-size:.88rem;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.88rem;color:var(--muted);margin:8px 0}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:2px;vertical-align:0;margin-right:5px}
+.sw-band{background:var(--band);border:1.5px solid var(--band-edge)}
+.sw-flag{border-top:2px dashed var(--stitch);height:0 !important;width:16px !important;vertical-align:4px !important}
+.sw-dot-in{background:var(--ink);border-radius:50% !important;width:10px !important;height:10px !important}
+.sw-dot-out{background:var(--stitch);border-radius:50% !important;width:10px !important;height:10px !important}
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <p class="kicker">Coach review draft, October 2026</p>
+  <h1>How the coaching agent judges a swing</h1>
+  <p class="lede">Our coaching agent turns phone video into one clear fix, a cue and a drill. Before it reaches players, we want coaches to check the logic: what we measure, the ranges we compare against, when we call something a problem, and the words players read.</p>
+  <p>Every number on this page is live in the current version. Most of the problem wording and all drills are a starter draft and have not had a coach review yet. That is what we are asking you to do. Leave a comment on any section you disagree with.</p>
+
+  <figure class="hero-fig" aria-labelledby="hero-cap">
+    <div id="hero"></div>
+    <figcaption id="hero-cap" class="figcap">One college hitter, six swings. Each dot is one swing’s stride length. The green band is the typical range for college hitters (42.3–55.8% of height). Past the dashed red line, a swing counts as overstriding. All six swings land there, so the agent makes overstriding the fix.</figcaption>
+  </figure>
+  <div class="legend" aria-hidden="true">
+    <span><i class="sw-band"></i>Typical range for the level</span>
+    <span><i class="sw-flag"></i>Flag line</span>
+    <span><i class="sw-dot-in"></i>Rep inside the flag line</span>
+    <span><i class="sw-dot-out"></i>Rep past the flag line</span>
+  </div>
+
+  <nav aria-label="Contents">
+    <ul class="toc">
+      <li><a href="#how-it-works">How it works</a></li>
+      <li><a href="#measurements">What we measure, and the ranges</a></li>
+      <li><a href="#flagging">When a problem gets flagged</a></li>
+      <li><a href="#problems">The problem library</a></li>
+      <li><a href="#priority">Which problem comes first</a></li>
+      <li><a href="#drills">Drills</a></li>
+      <li><a href="#score">The mechanics score</a></li>
+      <li><a href="#wording">What the agent may and may not say</a></li>
+      <li><a href="#examples">Worked examples</a></li>
+      <li><a href="#questions">Questions for you</a></li>
+    </ul>
+  </nav>
+</header>
+
+<section id="how-it-works" aria-labelledby="h-how">
+  <h2 id="h-how">How it works</h2>
+  <p>The agent never sees the video. It receives numbers measured from each swing or pitch, and fixed rules decide what those numbers show before the agent writes a word.</p>
+  <ol class="steps">
+    <li><div><b>Measure every rep <span class="who">Video engine</span></b>The video engine tracks body points and measures each swing or pitch: stride, knee angles, trunk tilt, timing. Each number comes with a confidence level (high, medium or estimate).</div></li>
+    <li><div><b>Compare with the typical range <span class="who">Fixed rules</span></b>Each rep is checked against the typical range for the player’s level. Estimates are never used as evidence.</div></li>
+    <li><div><b>Look for a repeated pattern <span class="who">Fixed rules</span></b>A problem is only flagged when it shows up on several reps. One bad swing is not a pattern.</div></li>
+    <li><div><b>Pick one priority fix <span class="who">Agent</span></b>The agent chooses the one problem that matters most from the ones the rules confirmed, and writes the explanation, a cue and one drill from our library.</div></li>
+    <li><div><b>Check every word <span class="who">Fixed rules</span></b>Every claim is checked against the numbers. If the note breaks a rule, the agent rewrites it. If it still fails, the player gets a fixed rule-based note instead.</div></li>
+  </ol>
+  <p>The mechanics score (0–100) is calculated by fixed rules from the same numbers. The agent cannot see or change it.</p>
+</section>
+
+<section id="measurements" aria-labelledby="h-meas">
+  <h2 id="h-meas">What we measure, and the ranges</h2>
+  <p>Ranges come from lab motion-capture data on real high school and college players, converted to what a phone camera measures. They describe what is <em>typical</em> for a level, not what is ideal.</p>
+  <p>Only measurements marked <span class="chip j">Judged</span> can create a problem or count in the score. Measurements marked <span class="chip r">Shown only</span> are reported to the player, but the camera cannot measure them reliably yet, so the agent never praises or criticises them.</p>
+  <div class="toggle" role="group" aria-label="Player level">
+    <button type="button" data-level="hs" aria-pressed="true">High school</button>
+    <button type="button" data-level="col" aria-pressed="false">College</button>
+  </div>
+  <p class="small muted" id="level-note"></p>
+  <h3>Hitting</h3>
+  <div id="m-hitting"></div>
+  <h3>Pitching</h3>
+  <div id="m-pitching"></div>
+  <div class="callout">
+    <p><b>Hitting is judged on two measurements today:</b> stride length and body drift past the front foot. Timing, head movement, knee angle and hip-shoulder separation are shown only, until we can measure them reliably from a phone.</p>
+  </div>
+</section>
+
+<section id="flagging" aria-labelledby="h-flag">
+  <h2 id="h-flag">When a problem gets flagged</h2>
+  <p>A problem appears in a player’s note only when every one of these is true:</p>
+  <ul class="rules">
+    <li><b>The rep clearly misses the range.</b> A rep only counts if it misses by more than a small margin: 10% of the range’s width. When the range is based on few athletes, the margin is bigger (1.5× for medium-confidence ranges, 2.5× for low-confidence ranges), so we don’t flag players against a rough range.</li>
+    <li><b>It shows up on at least 2 reps,</b> and on at least <b>30%</b> of the reps measured.</li>
+    <li><b>At least half the reps were measured</b> with high or medium confidence. Estimates never count.</li>
+  </ul>
+  <p>Example: high school hitting stride is 39.9–52.2% of height, a width of 12.3. That range is low confidence, so the margin is 10% × 2.5 × 12.3 = 3.1. A swing counts as overstriding past <b>55.3%</b>. For college (medium confidence) the line is at <b>57.8%</b>.</p>
+
+  <h3>Major or minor</h3>
+  <p>A problem is <b>major</b> when the typical miss is at least half a range width, it shows on at least 50% of reps, and at least 3 reps were measured. Otherwise it is <b>minor</b>. Major problems rank higher.</p>
+
+  <h3>Arm slot works differently</h3>
+  <p>Arm slot can’t be compared with a typical range, because a small change in camera angle shifts it by 8–20°. Instead we compare each pitch with the pitcher’s own median arm slot. A pitch counts when it is more than <b>9°</b> away from that median, with at least 3 pitches measured. The usual 2-rep and 30% rules still apply.</p>
+  <figure class="hero-fig" aria-labelledby="slot-cap">
+    <div id="slot-fig"></div>
+    <figcaption id="slot-cap" class="figcap">Eight pitches. The pitcher’s median arm slot is 66.7°, so the band runs from 57.7° to 75.7°. Four pitches (52.4°, 54.2°, 77.3°, 81.5°) fall outside it, which is 50% of pitches, so arm slot consistency is flagged.</figcaption>
+  </figure>
+</section>
+
+<section id="problems" aria-labelledby="h-prob">
+  <h2 id="h-prob">The problem library</h2>
+  <p>These are the only problems the agent is allowed to name. Each one is tied to a measurement and a direction. The text in the grey box is the starting wording; the agent writes its own sentences around it, but must keep the same meaning.</p>
+  <p class="small muted">Problems with a dashed border can’t be flagged yet, because the measurement they rely on is shown only.</p>
+  <h3>Hitting</h3>
+  <div id="p-hitting"></div>
+  <h3>Pitching</h3>
+  <div id="p-pitching"></div>
+</section>
+
+<section id="priority" aria-labelledby="h-pri">
+  <h2 id="h-pri">Which problem comes first</h2>
+  <p>When more than one problem is confirmed, the player gets one priority fix. The rules rank the problems, and the agent sees that ranking. The agent may pick a different one if it has a reason, and we track how often it does.</p>
+  <p>Each problem gets a priority number. Higher goes first:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Factor</th><th>Values</th></tr></thead>
+    <tbody>
+      <tr><td>How serious</td><td class="num">Major 2, minor 1</td></tr>
+      <tr><td>Part of the body</td><td class="num">Lower body 1.5, trunk 1.2, upper body and head 1.0</td></tr>
+      <tr><td>Measurement confidence</td><td class="num">High 1.0, medium 0.7</td></tr>
+      <tr><td>How well the range is established</td><td class="num">High 1.0, medium 0.85, low 0.5</td></tr>
+      <tr><td>How often it showed</td><td class="num">Share of reps, 0 to 1</td></tr>
+    </tbody>
+  </table></div>
+  <p>The factors are multiplied. Lower body goes first because the legs set up everything above them.</p>
+  <h3>Example: a college pitcher with two problems</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Problem</th><th>Serious</th><th>Body</th><th>Confidence</th><th>Range</th><th>How often</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>Stride is short</td><td class="num">1</td><td class="num">1.5</td><td class="num">1.0</td><td class="num">0.85</td><td class="num">8 of 8</td><td class="num"><b>1.28</b></td></tr>
+      <tr><td>Front leg does not firm up</td><td class="num">1</td><td class="num">1.5</td><td class="num">0.7</td><td class="num">1.0</td><td class="num">6 of 8</td><td class="num"><b>0.79</b></td></tr>
+    </tbody>
+  </table></div>
+  <p>The short stride shows on every pitch and is measured with more confidence, so it becomes the priority fix. The front leg is mentioned second.</p>
+</section>
+
+<section id="drills" aria-labelledby="h-drills">
+  <h2 id="h-drills">Drills</h2>
+  <p>The agent recommends exactly one drill, and only from this list, chosen from the drills listed for the priority fix. Rep schemes are sets × reps.</p>
+  <div id="d-list"></div>
+</section>
+
+<section id="score" aria-labelledby="h-score">
+  <h2 id="h-score">The mechanics score</h2>
+  <p>The score answers one question: how close are this player’s judged measurements to the typical range for their level? It is not a rating of how good a player is. Players see that sentence next to the score.</p>
+  <ul class="rules">
+    <li><b>Each rep:</b> inside the range scores 100. Outside it, the score drops in a straight line and reaches 0 at two range widths outside.</li>
+    <li><b>Each measurement:</b> the average over the reps that measured it.</li>
+    <li><b>Overall:</b> a weighted average. Weights use the same body-part, confidence and range factors as the priority order.</li>
+    <li><b>No score</b> if fewer than 2 judged measurements, or if the video could not be read.</li>
+  </ul>
+  <div class="slider">
+    <label for="sl" style="font-weight:600">Try it: a college hitter’s stride on one swing</label>
+    <input id="sl" type="range" min="20" max="90" step="0.1" value="62.6" aria-describedby="sl-out">
+    <div id="sl-bar"></div>
+    <div class="readout" id="sl-out" aria-live="polite"></div>
+  </div>
+  <h3>Score labels</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Score</th><th>What the player sees</th></tr></thead>
+    <tbody>
+      <tr><td class="num">85–100</td><td>Very close to typical</td></tr>
+      <tr><td class="num">70–84</td><td>Mostly close to typical</td></tr>
+      <tr><td class="num">50–69</td><td>Some areas to work on</td></tr>
+      <tr><td class="num">0–49</td><td>Several areas to work on</td></tr>
+    </tbody>
+  </table></div>
+  <h3>How sure we are of the score</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Score confidence</th><th>Needs</th></tr></thead>
+    <tbody>
+      <tr><td>High</td><td>Trust level 0.8 or more, 5+ reps, 3+ measurements</td></tr>
+      <tr><td>Medium</td><td>Trust level 0.55 or more, 3+ reps, 2+ measurements</td></tr>
+      <tr><td>Low</td><td>Anything less</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small muted">Trust level is the average of measurement confidence × range confidence across the judged measurements.</p>
+  <div class="callout">
+    <p>All high school ranges are currently low confidence (based on 12 hitters and 7 pitchers), so every high school score is marked <b>low confidence</b> until we have more data.</p>
+  </div>
+</section>
+
+<section id="wording" aria-labelledby="h-word">
+  <h2 id="h-word">What the agent may and may not say</h2>
+  <p>Every note is checked before a player sees it.</p>
+  <h3>Must</h3>
+  <ul class="rules">
+    <li>Name a problem only if the rules confirmed it, and point to the measurement that shows it.</li>
+    <li>Give one cue and one drill from the library when there is a fix.</li>
+    <li>Ask the player to record again when the video could not be read, and give no praise or fixes in that case.</li>
+    <li>Stay short: a headline of up to 25 words, up to 3 things that look solid, up to 2 things to work on, up to 3 notes about the data, and a cue of up to 20 words.</li>
+    <li>Read at about an 8th-grade level, in plain English.</li>
+  </ul>
+  <h3>Must not</h3>
+  <ul class="rules">
+    <li>Praise anything that is outside the range, is an estimate, or is evidence of a problem.</li>
+    <li>Use any number that isn’t in the player’s measurements.</li>
+    <li>Use judging words: good, bad, great, perfect, wrong, poor, weak, mistake.</li>
+    <li>Use medical words: injury, pain, sore, strain, tendon, ligament, UCL, doctor, surgery, health.</li>
+    <li>Include links, email addresses or phone numbers.</li>
+  </ul>
+</section>
+
+<section id="examples" aria-labelledby="h-ex">
+  <h2 id="h-ex">Worked examples</h2>
+  <p>Three test sessions for college players, showing the numbers, what was flagged, the score and the note a player would read.</p>
+  <div id="ex-list"></div>
+</section>
+
+<section id="questions" aria-labelledby="h-q">
+  <h2 id="h-q">Questions for you</h2>
+  <p>Please comment on any of these, or on anything else on the page.</p>
+  <ol class="qs">
+    <li>Do the high school and college ranges match what you see in your players? Stride in particular: 39.9–52.2% of height for high school hitters, 65.9–80.9% for high school pitchers.</li>
+    <li>JV currently uses the varsity ranges. Should JV be different?</li>
+    <li>Is 9° the right tolerance for arm slot from pitch to pitch?</li>
+    <li>Is “2 reps and 30% of reps” the right bar for calling something a pattern?</li>
+    <li>Should lower-body problems always come first?</li>
+    <li>Hitting has no “stride too short” problem today. Should it?</li>
+    <li>In example 2, a pitcher with two flagged problems still scores 96, “Very close to typical”. Does that feel right, or should flagged problems pull the score down more?</li>
+    <li>Are the problem descriptions, cues and drills right for each problem? Is anything missing?</li>
+    <li>Are 3×8 rep schemes right across the board?</li>
+    <li>Is any wording in the player notes unclear or off-putting for a high school player?</li>
+  </ol>
+</section>
+
+<footer>
+  <p>Ranges are calibrated from the OpenBiomechanics Project, Driveline Baseball (CC BY-NC-SA 4.0). Typical is not the same as ideal. Problem wording and drills are a starter draft pending coach review.</p>
+</footer>
+</main>
+
+<script>
+const M = {
+  hitting: [
+    {name:"Stride length", unit:"% of height", def:"Distance between the front and back ankle when the front foot lands, as a share of the player’s height.", judged:true, hs:[39.9,52.2], col:[42.3,55.8], conf:{hs:"low",col:"medium"}, n:{hs:12,col:73}, dir:"above", prob:"Front foot lands too far out"},
+    {name:"Body drift past front foot", unit:"% of height", def:"Where the hips are relative to the front ankle at contact. Negative means the hips stay behind the front foot.", judged:true, hs:[-26.5,-18.3], col:[-30.1,-19.3], conf:{hs:"low",col:"medium"}, n:{hs:12,col:73}, dir:"above", prob:"Body slides past the front foot", note:"Real hitters sit 19–30% of height behind the front foot."},
+    {name:"Foot plant to arm extension time", unit:"ms", def:"Time from front foot landing to the arms reaching extension.", judged:false, hs:[108.6,157.9], col:[97.8,145.6], why:"We detect arm extension, not actual ball contact, so this can’t be compared with the lab range yet."},
+    {name:"Head movement", unit:"% of height", def:"How far the head travels during the swing.", judged:false, hs:[0,5], col:[0,5], why:"The lab data has no head point, so the 0–5% range is unconfirmed. Not judged until our head tracking is checked on real clips."},
+    {name:"Front knee at contact", unit:"°", def:"Angle of the front knee at contact. 180° is a straight leg.", judged:false, hs:[150,180], col:[150,180], why:"From a front-on camera this angle reads about 28° straighter than the real knee and doesn’t track it."},
+    {name:"Hip and shoulder separation at foot plant", unit:"°", def:"Angle between the hip line and the shoulder line when the front foot lands.", judged:false, hs:[-23,-3], col:[-24,-4], why:"Not valid from a camera facing the chest."},
+    {name:"Load tempo", unit:"s", def:"Time spent in the load.", judged:false, why:"No range yet. Lab data suggests 0.76–1.41 s for college, but it depends on how we detect the start of the load."},
+    {name:"Load to launch ratio", unit:"ratio", def:"Load time compared with swing time.", judged:false, why:"No range yet. Lab data suggests 5.9–13.6 for college, with the same caveat as load tempo."},
+    {name:"Trunk tilt at contact", unit:"°", def:"Side tilt of the trunk at contact.", judged:false, why:"No range. The shoulder line is nearly edge-on to a chest-facing camera, so this isn’t a valid measurement."}
+  ],
+  pitching: [
+    {name:"Stride length", unit:"% of height", def:"Ankle-to-ankle distance when the front foot lands, as a share of height, from a side view.", judged:true, hs:[65.9,80.9], col:[66.0,81.5], conf:{hs:"low",col:"medium"}, n:{hs:7,col:75}, dir:"below", prob:"Stride is short", note:"Real pitchers measure about 74% this way (published 3D figures of about 83% use a different method)."},
+    {name:"Front knee bend at foot plant", unit:"°", def:"Bend in the front knee when the foot lands. 0° is a straight leg.", judged:true, hs:[32.7,57.0], col:[33.5,57.8], conf:{hs:"low",col:"high"}, n:{hs:7,col:75}, dir:null},
+    {name:"Front knee bend at release", unit:"°", def:"Bend in the front knee at ball release. 0° is a straight leg.", judged:true, hs:[25.4,57.1], col:[24.7,57.4], conf:{hs:"low",col:"high"}, n:{hs:7,col:75}, dir:"above", prob:"Front leg does not firm up"},
+    {name:"Front knee firming", unit:"°", def:"Knee bend at foot plant minus knee bend at release. Positive means the leg firmed up.", judged:true, hs:[-12.6,23.1], col:[-12.9,22.9], conf:{hs:"low",col:"high"}, n:{hs:7,col:75}, dir:null, note:"Wide spread between pitchers."},
+    {name:"Forward trunk tilt at release", unit:"°", def:"Lean of the hip-to-shoulder line toward the plate at release, from vertical.", judged:true, hs:[14.9,46.5], col:[14.8,46.4], conf:{hs:"low",col:"medium"}, n:{hs:7,col:75}, dir:"below", prob:"Finishes too upright"},
+    {name:"Leg lift to foot plant time", unit:"ms", def:"Time from peak leg lift to the front foot landing.", judged:true, hs:[541.1,772.5], col:[532.8,756.1], conf:{hs:"low",col:"medium"}, n:{hs:7,col:75}, dir:"below", prob:"Delivery is rushed"},
+    {name:"Foot plant to release time", unit:"ms", def:"Time from the front foot landing to ball release.", judged:true, hs:[117.7,155.5], col:[114.5,152.7], conf:{hs:"low",col:"medium"}, n:{hs:7,col:75}, dir:"below", prob:"Delivery is rushed"},
+    {name:"Head stability", unit:"% of height", def:"How much the head moves up and down from leg lift to release.", judged:true, hs:[17.7,28.2], col:[17.7,28.2], conf:{hs:"low",col:"low"}, n:{hs:100,col:100}, dir:null, note:"One range for all levels, from 100 pitchers."},
+    {name:"Trunk side lean at release", unit:"°", def:"Lean toward the glove side at release.", judged:false, hs:[17,37], col:[9,29], why:"A side-view camera can’t see side lean."},
+    {name:"Arm slot", unit:"°", def:"Arm angle at release.", judged:false, hs:[50,68], col:[50,68], why:"Shifts 8–20° with a slightly off camera angle. Used only to check consistency from pitch to pitch."},
+    {name:"Hip and shoulder separation at foot plant", unit:"°", def:"Angle between the hip line and the shoulder line when the front foot lands.", judged:false, hs:[47,67], col:[47,67], why:"The camera estimate doesn’t match the real 3D rotation."}
+  ]
+};
+const TOL = {high:1.0, medium:1.5, low:2.5};
+const P = {
+  hitting:[
+    {label:"Front foot lands too far out", when:"Stride length above the range", can:true, what:"Your front foot lands too far out.", why:"A long step pulls your weight forward, so your hips and hands have a hard time turning with power.", cue:"Take a short, quiet step. Stay tall over your back leg.", body:"Lower body"},
+    {label:"Body slides past the front foot", when:"Body drift above the range (hips too close to or past the front foot)", can:true, what:"Your body slides forward past your front foot.", why:"Your weight gets ahead of your hands, and you lose power from the ground.", cue:"Stay behind your front knee. Turn, don’t slide.", body:"Lower body"},
+    {label:"Front foot lands too early", when:"Foot plant to contact longer than the range, or load tempo shorter than the range", can:false, off:"Both measurements are shown only.", what:"Your front foot lands early.", why:"So your hands have to rush to catch up.", cue:"Get to your back side, then go.", body:"Lower body"},
+    {label:"Swing starts late", when:"Foot plant to contact shorter than the range", can:false, off:"Foot plant to contact is shown only.", what:"Your swing starts late.", why:"You have less time to see the pitch and get the bat to the ball.", cue:"Start your move when the pitcher starts. Be ready early.", body:"Lower body"},
+    {label:"Head moves during the swing", when:"Head movement above the range", can:false, off:"Head movement is shown only.", what:"Your head moves toward the pitcher during the swing.", why:"When your head moves, your eyes move too. That makes the ball harder to track.", cue:"Keep your eyes quiet. Let the ball come to you.", body:"Head"},
+    {label:"Front leg gives way at contact", when:"Front knee angle at contact below the range", can:false, off:"Front knee at contact is shown only.", what:"Your front leg bends and gives way at contact.", why:"A front leg that gives way leaks the power you built from the ground.", cue:"Make a firm wall with your front leg as you swing.", body:"Lower body"},
+    {label:"Front shoulder opens early", when:"Hip and shoulder separation", can:false, off:"Can’t be measured from a phone camera.", what:"Your front shoulder turns open too soon.", why:"Your bat takes a longer path, and the outside pitch gets hard to reach.", cue:"Keep your front shoulder in. Let your hips lead.", body:"Trunk"}
+  ],
+  pitching:[
+    {label:"Stride is short", when:"Stride length below the range", can:true, what:"Your stride is shorter than the typical range for your level.", why:"A short stride makes it harder to use your legs to drive toward the plate.", cue:"Push off the rubber and reach toward the plate.", body:"Lower body"},
+    {label:"Front leg does not firm up", when:"Front knee bend at release above the range", can:true, what:"Your front leg bends more after your foot lands.", why:"A firm front leg helps turn your forward motion into a strong finish.", cue:"Land, then brace. Make a firm post.", body:"Lower body"},
+    {label:"Finishes too upright", when:"Forward trunk tilt at release below the range", can:true, what:"Your body stays more upright at release.", why:"Leaning toward the plate helps you stay out front and keep the ball down.", cue:"Chest over your front knee as you let go.", body:"Trunk"},
+    {label:"Delivery is rushed", when:"Leg lift to foot plant, or foot plant to release, shorter than the range", can:true, what:"Your front foot lands early in your delivery.", why:"Your body and arm can get out of sync.", cue:"Stay back, then go. Keep the same smooth rhythm.", body:"Lower body"},
+    {label:"Arm slot changes from pitch to pitch", when:"A pitch more than 9° from the pitcher’s own median arm slot", can:true, what:"Your arm angle changes from pitch to pitch.", why:"A steady arm angle lets the ball come out of the same spot, so your pitches land where you aim.", cue:"Find your slot and repeat it every time.", body:"Upper body"},
+    {label:"Leans too far to the glove side", when:"Trunk side lean at release above the range", can:false, off:"Side lean is shown only.", what:"Your body leans toward your glove side at release.", why:"A big side lean can move your release point from pitch to pitch.", cue:"Stay tall and balanced. Finish toward the plate.", body:"Upper body"},
+    {label:"Trunk opens too early", when:"Hip and shoulder separation", can:false, off:"Can’t be measured from a phone camera.", what:"Your chest opens up before your front foot lands.", why:"Opening early gives up some of the power from your legs and hips.", cue:"Hips first, chest later. Stay closed until your foot lands.", body:"Trunk"}
+  ]
+};
+const D = [
+  ["Hitting: front foot lands too far out",[["Short Step Tee","3×8","Set up with a normal stance. Take a short, quiet step and swing at a ball on the tee. Land softly.","Short step, stay tall."],["No-Stride Tee","3×8","Keep your front foot planted (a toe tap is fine). Turn and swing off the tee so you feel your hips do the work.","Turn, don’t reach."]]],
+  ["Hitting: body slides past the front foot",[["Balance Hold Tee","3×8","Swing off the tee, then hold your finish for two seconds without stepping. Your weight should stay over your feet.","Turn, don’t slide."],["Back Knee Line Dry Swings","3×8","Lay a line even with the inside of your front foot. Swing without your belly or hips crossing the line.","Stay behind your front knee."]]],
+  ["Hitting: front foot lands too early",[["Hold-the-Load Tee","3×8","Load back and count one second before your front foot lands. Then swing at the ball on the tee.","Back side, then go."],["Slow-Motion Load Dry Swings","3×8","Move through your load in slow motion, then swing at full speed. Feel the front foot land after the load is done.","Slow load, quick swing."],["Opposite-Field Front Toss","3×8","Partner tosses to the outer half. Let the ball travel deep and hit it to the opposite field.","Stay closed, let it travel."]]],
+  ["Hitting: swing starts late",[["Slow-Motion Load Dry Swings","3×8","Move through your load in slow motion, then swing at full speed. Feel the front foot land after the load is done.","Slow load, quick swing."],["Rhythm Front Toss","3×8","Partner tosses from the side. Start your move as the tosser’s hand starts forward. Swing on time.","Start when they start."],["Early Ready Dry Swings","3×8","Start from your set stance. On a partner’s signal, load right away and swing. Aim to be ready before the pitch would arrive.","Be ready early."]]],
+  ["Hitting: head moves during the swing",[["Quiet Head Tee","3×8","Pick a spot on the ball. Keep your eyes and chin on that spot until after contact. A partner can watch your head from the side.","Eyes on the spot."],["Contact Point Front Toss","3×8","Partner tosses. Track the ball all the way to the contact point and finish with your head still.","Let the ball come to you."]]],
+  ["Hitting: front leg gives way at contact",[["Firm Front Side Tee","3×8","Swing off the tee and finish with your front leg straight and firm. Hold the finish for two seconds.","Firm wall."],["Front Leg Brace Dry Swings","3×8","Stride, then press into the ground with your front leg as you turn. Feel the leg firm up before the bat arrives.","Press, then turn."]]],
+  ["Hitting: front shoulder opens early",[["Front Shoulder In Tee","3×8","Set the tee on the outer half. Keep your front shoulder pointed at the pitcher until your hips have turned, then swing.","Shoulder in."],["Hips-First Dry Swings","3×8","Start the swing by turning your back hip. Feel your chest follow a moment later.","Hips lead."],["Opposite-Field Front Toss","3×8","Partner tosses to the outer half. Let the ball travel deep and hit it to the opposite field.","Stay closed, let it travel."]]],
+  ["Pitching: stride is short",[["Stride Line Flat Ground","3×8","Mark a line at your target stride length on the ground. Throw easy at about half effort and land at the line. Log these throws in your pitch count.","Reach to the line."],["Balance Point Reach (No Ball)","3×8","From your balance point, push off and reach your front foot toward the plate. Hold the landing for one second. No ball.","Push, then reach."],["Landing Pause Flat Ground","3×8","Throw easy. Pause for one second when your front foot lands to check your stride and balance.","Land and check."]]],
+  ["Pitching: front leg does not firm up",[["Front Leg Brace Drill","3×8","Throw easy. As your front foot lands, press down and firm up the front leg. Hold your finish for one second.","Land, then brace."],["Firm Post Landing (No Ball)","3×8","Go through your delivery without a ball. Land and hold with a firm front leg for two seconds.","Firm post."]]],
+  ["Pitching: finishes too upright",[["Chest Over Knee Finish","3×8","Throw easy. At release, let your chest move over your front knee. Finish with your back leg coming around.","Chest over knee."],["Finish Hold (No Ball)","3×8","Go through your delivery without a ball. Hold the finished position with your chest over the front knee for two seconds.","Finish out front."]]],
+  ["Pitching: delivery is rushed",[["Tempo Count Delivery (No Ball)","3×8","Say ‘one’ at leg lift, ‘two’ at landing. Keep the same count every time without a ball.","Same rhythm."],["Pause at Balance Flat Ground","3×8","Throw easy. Pause at your balance point for one second, then go. Stay back before you move forward.","Stay back, then go."],["One-Cue Bullpen","2×10","In a normal bullpen, pick one cue (hips first, chest later). Throw at your usual intensity within your pitch plan and count every pitch in your log.","One cue at a time."]]],
+  ["Pitching: arm slot changes from pitch to pitch",[["Mirror Slot Drill (No Ball)","3×8","Without a ball, go through your delivery and match your arm angle each time. Check yourself in the mirror.","Same slot."],["Slot Target Play Catch","3×8","Play catch at an easy pace to a target. Focus on matching your arm angle each throw, not on speed.","Repeat your slot."]]],
+  ["Pitching: leans too far to the glove side",[["Tall Balance Line Drill","3×8","Lay a line toward the plate. Throw easy and keep your head and spine above the line through release.","Stay tall."],["Glove Side Tall (No Ball)","3×8","Without a ball, bring your glove side in and stay tall at the finish. A partner or mirror can check for a side lean.","Tall and balanced."]]],
+  ["Pitching: trunk opens too early",[["Closed Chest Hold (No Ball)","3×8","Go through your delivery without a ball. Keep your chest facing the side until your front foot lands.","Closed until landing."],["One-Cue Bullpen","2×10","In a normal bullpen, pick one cue (hips first, chest later). Throw at your usual intensity within your pitch plan and count every pitch in your log.","One cue at a time."]]]
+];
+const EX = [
+  {title:"1. College hitter who overstrides", sub:"6 swings", bars:[
+    {name:"Stride length", unit:"%", lo:42.3, hi:55.8, conf:"medium", dir:"above", reps:[64.7,65.3,65.6,64.1,65.1,66.0], res:"6 of 6 swings past the flag line. Typical miss 0.7 range widths: major."},
+    {name:"Body drift past front foot", unit:"%", lo:-30.1, hi:-19.3, conf:"medium", dir:"above", reps:[-22.9,-25.2,-25.4,-24.1,-26.7,-26.4], res:"All inside the range: this can be praised."}],
+    score:"80, Mostly close to typical (medium confidence, 2 judged measurements, 6 swings)",
+    note:{hl:"Parts of your swing look solid. One change can help the most.", solid:["Your body stays behind your front foot."], work:["Your front foot lands too far out. A long step pulls your weight forward, so your hips and hands have a hard time turning with power. This showed up in 100% of your reps."], cue:"Take a short, quiet step. Stay tall over your back leg.", drill:"Short Step Tee: 3×8. Short step, stay tall.", data:["Some numbers are only estimates from one camera, so we are not judging them."]}},
+  {title:"2. College pitcher with a short stride and a soft front leg", sub:"8 pitches", bars:[
+    {name:"Stride length", unit:"%", lo:66.0, hi:81.5, conf:"medium", dir:"below", reps:[60.6,61.3,60.0,59.6,58.8,59.1,62.7,61.8], res:"8 of 8 pitches past the flag line. Minor (typical miss 0.4 range widths)."},
+    {name:"Front knee bend at release", unit:"°", lo:24.7, hi:57.4, conf:"high", dir:"above", reps:[65.3,67.5,67.7,66.7,68.0,59.9,66.7,60.6], res:"6 of 8 pitches past the flag line. Minor."}],
+    score:"96, Very close to typical (medium confidence, 8 judged measurements, 8 pitches). Six other measurements are in range, which outweighs the two problems.",
+    note:{hl:"Parts of your delivery look solid. One change can help the most.", solid:["Your leg lift to foot plant timing matches your target.","Your foot plant to release timing matches your target.","Your head stays steady through your delivery."], work:["Your stride is shorter than the typical range for your level. A short stride makes it harder to use your legs to drive toward the plate. This showed up in 100% of your reps.","Your front leg bends more after your foot lands."], cue:"Push off the rubber and reach toward the plate.", drill:"Stride Line Flat Ground: 3×8. Reach to the line.", data:["Some numbers are only estimates from one camera, so we are not judging them."]}},
+  {title:"3. College pitcher whose arm slot changes", sub:"8 pitches", bars:[
+    {name:"Arm slot vs the pitcher’s own median (66.7°)", unit:"°", lo:57.7, hi:75.7, spread:true, reps:[74.6,52.4,54.2,77.3,60.7,67.1,66.3,81.5], res:"4 of 8 pitches more than 9° from the median: 50%, flagged as minor."}],
+    score:"100, Very close to typical (arm slot doesn’t count in the score because it can’t be compared with a range).",
+    note:{hl:"Parts of your delivery look solid. One change can help the most.", solid:["Your stride length is in the typical range for your level.","Your leg lift to foot plant timing matches your target.","Your foot plant to release timing matches your target."], work:["Your arm angle changes from pitch to pitch. A steady arm angle lets the ball come out of the same spot, so your pitches land where you aim. This showed up in 50% of your reps."], cue:"Find your slot and repeat it every time.", drill:"Mirror Slot Drill (No Ball): 3×8. Same slot.", data:["Some numbers are only estimates from one camera, so we are not judging them."]}}
+];
+
+const fmt = v => (Math.round(v*10)/10).toString().replace("-","−");
+const u = x => x==="°" ? "°" : " "+x;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function bar(o){
+  const W=360, padL=16, padR=16, base=58, H=102;
+  const w = o.hi-o.lo;
+  let lo, hi;
+  if (o.domain){ [lo,hi]=o.domain; }
+  else {
+    lo=o.lo-w*0.6; hi=o.hi+w*0.6;
+    if (o.reps) { lo=Math.min(lo,...o.reps.map(r=>r-w*0.12)); hi=Math.max(hi,...o.reps.map(r=>r+w*0.12)); }
+    if (o.flag!=null) { lo=Math.min(lo,o.flag-w*0.15); hi=Math.max(hi,o.flag+w*0.15); }
+  }
+  const X = v => padL + (v-lo)/(hi-lo)*(W-padL-padR);
+  const ref = o.ref;
+  let s = `<svg class="bar" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria||'')}">`;
+  s += `<line x1="${padL}" x2="${W-padR}" y1="${base}" y2="${base}" style="stroke:var(--line)" stroke-width="2"/>`;
+  s += `<rect x="${X(o.lo)}" y="${base-22}" width="${X(o.hi)-X(o.lo)}" height="44" rx="5" style="fill:${ref?'var(--ref-band)':'var(--band)'};stroke:${ref?'var(--ref)':'var(--band-edge)'}" stroke-width="1.5" ${ref?'stroke-dasharray="5 4"':''}/>`;
+  s += `<text class="lab" x="${X(o.lo)}" y="${base-28}" text-anchor="middle">${fmt(o.lo)}</text>`;
+  s += `<text class="lab" x="${X(o.hi)}" y="${base-28}" text-anchor="middle">${fmt(o.hi)}</text>`;
+  if (o.flag!=null){
+    const fx=X(o.flag);
+    s += `<line x1="${fx}" x2="${fx}" y1="${base-24}" y2="${base+24}" style="stroke:var(--stitch)" stroke-width="2" stroke-dasharray="4 3"/>`;
+    s += `<text class="flagtxt" x="${fx}" y="${base+40}" text-anchor="middle">${fmt(o.flag)}</text>`;
+  }
+  if (o.reps){
+    const sorted = o.reps.map((v,i)=>({v,i})).sort((a,b)=>a.v-b.v);
+    let lastX=-99, lane=0;
+    sorted.forEach(({v})=>{
+      const x=X(v);
+      lane = (x-lastX<11) ? (lane+1)%3 : 0; lastX=x;
+      const out = o.isOut(v);
+      s += `<circle cx="${x}" cy="${base-10+lane*10}" r="5.5" style="fill:${out?'var(--stitch)':'var(--ink)'};stroke:var(--card)" stroke-width="1.5"/>`;
+    });
+  }
+  if (o.marker!=null){
+    const mx=X(o.marker);
+    s += `<circle cx="${mx}" cy="${base}" r="8" style="fill:${o.isOut(o.marker)?'var(--stitch)':'var(--ink)'};stroke:var(--card)" stroke-width="2"/>`;
+  }
+  return s+`</svg>`;
+}
+
+function flagLine(lo,hi,conf,dir){
+  if(!dir) return null;
+  const m = 0.1*TOL[conf]*(hi-lo);
+  return dir==="above" ? hi+m : lo-m;
+}
+
+let level="hs";
+function renderMetrics(){
+  for (const disc of ["hitting","pitching"]){
+    const el=document.getElementById("m-"+disc);
+    el.innerHTML = M[disc].map(m=>{
+      const r = m[level];
+      let chips = m.judged ? `<span class="chip j">Judged</span>` : `<span class="chip r">Shown only</span>`;
+      if (m.judged && m.prob) chips += `<span class="chip p">Can flag: ${esc(m.prob)}</span>`;
+      if (m.judged && !m.prob) chips += `<span class="chip r">Counts toward the score only</span>`;
+      let vals = "";
+      let fig = "";
+      if (r){
+        const conf = m.conf ? m.conf[level] : "low";
+        const fl = m.judged ? flagLine(r[0],r[1],conf,m.dir) : null;
+        vals += `<span>Typical range <strong>${fmt(r[0])} to ${fmt(r[1])}${esc(u(m.unit))}</strong></span>`;
+        if (m.judged){
+          vals += `<span>Based on <strong>${m.n[level]} athletes</strong></span><span>Range confidence <strong>${conf}</strong></span>`;
+          if (fl!=null) vals += `<span>Flagged ${m.dir} <strong>${fmt(fl)}${esc(u(m.unit))}</strong></span>`;
+        }
+        fig = bar({lo:r[0],hi:r[1],flag:fl,ref:!m.judged,aria:`${m.name}: typical range ${fmt(r[0])} to ${fmt(r[1])} ${m.unit}`+(fl!=null?`, flagged ${m.dir} ${fmt(fl)}`:"")});
+      } else {
+        vals += `<span><strong>No range yet</strong></span>`;
+      }
+      const note = m.judged ? (m.note?`<p class="mnote">${esc(m.note)}</p>`:"") : `<p class="mnote"><b>Why it’s not judged:</b> ${esc(m.why)}</p>`;
+      return `<article class="metric${m.judged?'':' ref'}"><div class="mhead"><span class="mname">${esc(m.name)}</span>${chips}</div><p class="mdef">${esc(m.def)} <span class="muted">(${esc(m.unit)})</span></p><div class="mvals">${vals}</div>${fig}${note}</article>`;
+    }).join("");
+  }
+  document.getElementById("level-note").textContent = level==="hs"
+    ? "High school ranges apply to both JV and varsity. They are based on 12 hitters and 7 pitchers, so they’re all low confidence and use a wider flag margin."
+    : "College ranges are based on 73 hitters and 75 pitchers.";
+}
+document.querySelectorAll(".toggle button").forEach(b=>b.addEventListener("click",()=>{
+  level=b.dataset.level;
+  document.querySelectorAll(".toggle button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+  renderMetrics();
+}));
+
+function renderProblems(){
+  for (const disc of ["hitting","pitching"]){
+    document.getElementById("p-"+disc).innerHTML = P[disc].map(p=>`
+      <article class="prob${p.can?'':' off'}">
+        <div class="mhead"><span class="mname">${esc(p.label)}</span>${p.can?'<span class="chip j">Can be flagged today</span>':'<span class="chip r">Not flagged yet</span>'}<span class="chip r">${esc(p.body)}</span></div>
+        <p class="mdef"><b>Flagged when:</b> ${esc(p.when)}.${p.off?` <span class="muted">${esc(p.off)}</span>`:""}</p>
+        <div class="say"><div><span>What</span> ${esc(p.what)}</div><div><span>Why</span> ${esc(p.why)}</div><div><span>Cue</span> ${esc(p.cue)}</div></div>
+      </article>`).join("");
+  }
+}
+
+function renderDrills(){
+  document.getElementById("d-list").innerHTML = D.map(([title,list])=>`
+    <h3>${esc(title)}</h3>
+    ${list.map(d=>`<div class="drill"><span class="dn">${esc(d[0])}</span><span class="dr">${esc(d[1])}</span><div>${esc(d[2])}</div><div class="muted small">Cue: ${esc(d[3])}</div></div>`).join("")}`).join("");
+}
+
+function renderExamples(){
+  document.getElementById("ex-list").innerHTML = EX.map(e=>{
+    const bars = e.bars.map(b=>{
+      let fl=null, isOut;
+      if (b.spread){ const med=(b.lo+b.hi)/2; isOut=v=>Math.abs(v-med)>9; }
+      else { fl=flagLine(b.lo,b.hi,b.conf,b.dir); isOut = v => b.dir==="above" ? v>fl : v<fl; }
+      return `<p style="margin:14px 0 0"><b>${esc(b.name)}</b> <span class="muted small">(${esc(b.unit)})</span></p>`+
+        bar({lo:b.lo,hi:b.hi,flag:fl,reps:b.reps,isOut,aria:`${b.name}: ${b.reps.map(fmt).join(", ")}`})+
+        `<p class="small" style="margin:2px 0">${esc(b.res)}</p>`;
+    }).join("");
+    const n=e.note;
+    return `<div class="example"><h3>${esc(e.title)} <span class="muted small" style="font-family:Barlow,sans-serif;font-weight:400">${esc(e.sub)}</span></h3>${bars}
+      <p><b>Mechanics score:</b> ${esc(e.score)}</p>
+      <div class="note-card" aria-label="Note the player reads"><p class="kicker" style="margin:0 0 4px">What the player reads</p><p class="hl">${esc(n.hl)}</p>
+      <dl><dt>What looks solid</dt>${n.solid.map(t=>`<dd>${esc(t)}</dd>`).join("")}
+      <dt>What to work on</dt>${n.work.map(t=>`<dd>${esc(t)}</dd>`).join("")}
+      <dt>Cue</dt><dd>${esc(n.cue)}</dd><dt>Drill</dt><dd>${esc(n.drill)}</dd>
+      <dt>Keep in mind</dt>${n.data.map(t=>`<dd>${esc(t)}</dd>`).join("")}</dl></div></div>`;
+  }).join("");
+}
+
+function renderHero(){
+  const lo=42.3, hi=55.8, fl=flagLine(lo,hi,"medium","above");
+  document.getElementById("hero").innerHTML = bar({lo,hi,flag:fl,reps:[64.7,65.3,65.6,64.1,65.1,66.0],isOut:v=>v>fl,aria:"Stride lengths 64.1 to 66.0 percent of height against a college range of 42.3 to 55.8, flag line 57.8"});
+  const so=[74.6,52.4,54.2,77.3,60.7,67.1,66.3,81.5];
+  document.getElementById("slot-fig").innerHTML = bar({lo:57.7,hi:75.7,reps:so,isOut:v=>Math.abs(v-66.7)>9,aria:"Arm slots "+so.join(", ")+" degrees against a band of 57.7 to 75.7"});
+}
+
+function renderSlider(){
+  const lo=42.3, hi=55.8, w=hi-lo, sl=document.getElementById("sl");
+  const label = s => s>=85?"Very close to typical":s>=70?"Mostly close to typical":s>=50?"Some areas to work on":"Several areas to work on";
+  const upd=()=>{
+    const v=parseFloat(sl.value);
+    const miss=Math.max(lo-v,v-hi,0), widths=miss/w;
+    const score=Math.max(0,100*(1-widths/2));
+    document.getElementById("sl-bar").innerHTML = bar({lo,hi,marker:v,domain:[20,90],isOut:x=>x<lo||x>hi,aria:`Stride ${fmt(v)} percent against the range ${lo} to ${hi}`});
+    document.getElementById("sl-out").innerHTML = `<span class="big">${Math.round(score)}</span><span>Stride <b>${fmt(v)}%</b> of height</span><span>${miss===0?"Inside the range":`${fmt(widths)} range widths outside`}</span><span class="muted">${label(Math.round(score))} (if this were the only measurement)</span>`;
+  };
+  sl.addEventListener("input",upd); upd();
+}
+
+renderHero(); renderMetrics(); renderProblems(); renderDrills(); renderExamples(); renderSlider();
+</script>
+</body>
+</html>
